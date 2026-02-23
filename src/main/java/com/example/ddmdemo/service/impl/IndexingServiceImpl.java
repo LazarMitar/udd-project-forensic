@@ -1,14 +1,16 @@
 package com.example.ddmdemo.service.impl;
 
 import ai.djl.translate.TranslateException;
+import com.example.ddmdemo.dto.ForensicReportDTO;
 import com.example.ddmdemo.exceptionhandling.exception.LoadingException;
 import com.example.ddmdemo.exceptionhandling.exception.StorageException;
-import com.example.ddmdemo.indexmodel.DummyIndex;
-import com.example.ddmdemo.indexrepository.DummyIndexRepository;
-import com.example.ddmdemo.model.DummyTable;
-import com.example.ddmdemo.respository.DummyRepository;
+import com.example.ddmdemo.indexmodel.ForensicReportIndex;
+import com.example.ddmdemo.indexrepository.ForensicReportIndexRepository;
+import com.example.ddmdemo.model.ForensicReport;
+import com.example.ddmdemo.respository.ForensicReportRepository;
 import com.example.ddmdemo.service.interfaces.FileService;
 import com.example.ddmdemo.service.interfaces.IndexingService;
+import com.example.ddmdemo.util.ForensicReportParser;
 import com.example.ddmdemo.util.VectorizationUtil;
 import jakarta.transaction.Transactional;
 import java.io.IOException;
@@ -21,7 +23,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.text.PDFTextStripper;
 import org.apache.tika.Tika;
-import org.apache.tika.language.detect.LanguageDetector;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -30,93 +31,85 @@ import org.springframework.web.multipart.MultipartFile;
 @Slf4j
 public class IndexingServiceImpl implements IndexingService {
 
-    private final DummyIndexRepository dummyIndexRepository;
-
-    private final DummyRepository dummyRepository;
-
+    private final ForensicReportIndexRepository forensicReportIndexRepository;
+    private final ForensicReportRepository forensicReportRepository;
     private final FileService fileService;
+    private final ForensicReportParser forensicReportParser;
 
-    private final LanguageDetector languageDetector;
+    @Override
+    public ForensicReportDTO parseDocument(MultipartFile documentFile) {
+        // Validacija mime tipa
+        detectMimeType(documentFile);
 
+        // Čuvanje u MinIO
+        var serverFilename = fileService.store(documentFile, UUID.randomUUID().toString());
+
+        // Čuvanje u PostgreSQL
+        var report = new ForensicReport();
+        report.setServerFilename(serverFilename);
+        report.setMimeType("application/pdf");
+        forensicReportRepository.save(report);
+
+        // Parsiranje teksta
+        var text = extractDocumentContent(documentFile);
+        var dto = forensicReportParser.parse(text);
+        dto.setServerFilename(serverFilename);
+
+        return dto;
+    }
 
     @Override
     @Transactional
-    public String indexDocument(MultipartFile documentFile) {
-        var newEntity = new DummyTable();
-        var newIndex = new DummyIndex();
-
-        var title = Objects.requireNonNull(documentFile.getOriginalFilename()).split("\\.")[0];
-        newIndex.setTitle(title);
-        newEntity.setTitle(title);
-
-        var documentContent = extractDocumentContent(documentFile);
-        if (detectLanguage(documentContent).equals("SR")) {
-            newIndex.setContentSr(documentContent);
-        } else {
-            newIndex.setContentEn(documentContent);
-        }
-        newEntity.setContent(documentContent);
-
-        var serverFilename = fileService.store(documentFile, UUID.randomUUID().toString());
-        newIndex.setServerFilename(serverFilename);
-        newEntity.setServerFilename(serverFilename);
-
-        newEntity.setMimeType(detectMimeType(documentFile));
-        var savedEntity = dummyRepository.save(newEntity);
+    public void indexDocument(ForensicReportDTO dto, String serverFilename) {
+        var index = new ForensicReportIndex();
+        index.setForensicAnalyst(dto.getForensicAnalyst());
+        index.setOrganization(dto.getOrganization());
+        index.setMalwareName(dto.getMalwareName());
+        index.setDescription(dto.getDescription());
+        index.setThreatClassification(dto.getThreatClassification());
+        index.setHashValue(dto.getHashValue());
+        index.setServerFilename(serverFilename);
 
         try {
-            newIndex.setVectorizedContent(VectorizationUtil.getEmbedding(title));
+            index.setVectorizedContent(
+                    VectorizationUtil.getEmbedding(dto.getDescription()));
         } catch (TranslateException e) {
-            log.error("Could not calculate vector representation for document with ID: {}",
-                savedEntity.getId());
+            log.error("Could not vectorize document: {}", serverFilename);
         }
-        newIndex.setDatabaseId(savedEntity.getId());
-        dummyIndexRepository.save(newIndex);
 
-        return serverFilename;
+        forensicReportIndexRepository.save(index);
+
+        log.info("REPORT_INDEXED SUCCESS organization={} analyst={} malware={} classification={}",
+                dto.getOrganization(),
+                dto.getForensicAnalyst(),
+                dto.getMalwareName(),
+                dto.getThreatClassification());
     }
 
     private String extractDocumentContent(MultipartFile multipartPdfFile) {
-        String documentContent;
         try (var pdfFile = multipartPdfFile.getInputStream()) {
             var pdDocument = PDDocument.load(pdfFile);
             var textStripper = new PDFTextStripper();
-            documentContent = textStripper.getText(pdDocument);
+            var content = textStripper.getText(pdDocument);
             pdDocument.close();
+            return content;
         } catch (IOException e) {
             throw new LoadingException("Error while trying to load PDF file content.");
         }
-
-        return documentContent;
     }
 
-    private String detectLanguage(String text) {
-        var detectedLanguage = languageDetector.detect(text).getLanguage().toUpperCase();
-        if (detectedLanguage.equals("HR")) {
-            detectedLanguage = "SR";
-        }
-
-        return detectedLanguage;
-    }
-
-    private String detectMimeType(MultipartFile file) {
+    private void detectMimeType(MultipartFile file) {
         var contentAnalyzer = new Tika();
-
-        String trueMimeType;
-        String specifiedMimeType;
         try {
-            trueMimeType = contentAnalyzer.detect(file.getBytes());
-            specifiedMimeType =
-                Files.probeContentType(Path.of(Objects.requireNonNull(file.getOriginalFilename())));
+            var trueMimeType = contentAnalyzer.detect(file.getBytes());
+            var specifiedMimeType = Files.probeContentType(
+                    Path.of(Objects.requireNonNull(file.getOriginalFilename())));
+            if (!trueMimeType.equals(specifiedMimeType) &&
+                    !(trueMimeType.contains("zip") && specifiedMimeType.contains("zip"))) {
+                throw new StorageException("True mime type is different from specified one.");
+            }
         } catch (IOException e) {
             throw new StorageException("Failed to detect mime type for file.");
         }
-
-        if (!trueMimeType.equals(specifiedMimeType) &&
-            !(trueMimeType.contains("zip") && specifiedMimeType.contains("zip"))) {
-            throw new StorageException("True mime type is different from specified one, aborting.");
-        }
-
-        return trueMimeType;
     }
 }
