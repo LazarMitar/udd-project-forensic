@@ -1,0 +1,14 @@
+<header class="app-header">
+  <div class="header-inner">
+    <a routerLink="/" class="logo">UDD – Forenzički izveštaji</a>
+    <div class="user-bar">
+      @if (user(); as u) {
+        <span class="user-name">{{ u.username }} <small>({{ u.role }})</small></span>
+        <button type="button" class="btn btn-outline" (click)="logout()">Odjava</button>
+      }
+    </div>
+  </div>
+</header>
+<main class="app-main">
+  <router-outlet></router-outlet>
+</main>

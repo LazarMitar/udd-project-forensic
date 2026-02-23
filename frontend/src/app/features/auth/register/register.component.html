@@ -1,0 +1,63 @@
+<div class="auth-card">
+  <h1>Registracija</h1>
+  <p class="subtitle">Kreirajte novi nalog</p>
+
+  @if (success) {
+    <div class="success-msg" role="status">
+      Nalog je uspešno kreiran. Možete se <a routerLink="/login">prijaviti</a>.
+    </div>
+  } @else {
+    <form [formGroup]="form" (ngSubmit)="onSubmit()" class="auth-form">
+      @if (error) {
+        <div class="error-msg" role="alert">{{ error }}</div>
+      }
+      <div class="field">
+        <label for="username">Korisničko ime</label>
+        <input
+          id="username"
+          type="text"
+          formControlName="username"
+          autocomplete="username"
+          placeholder="Min. 3 karaktera"
+        />
+        @if (form.get('username')?.invalid && form.get('username')?.touched) {
+          <span class="field-error">
+            @if (form.get('username')?.errors?.['required']) {
+              Korisničko ime je obavezno
+            } @else {
+              Korisničko ime: 3–50 karaktera
+            }
+          </span>
+        }
+      </div>
+      <div class="field">
+        <label for="password">Lozinka</label>
+        <input
+          id="password"
+          type="password"
+          formControlName="password"
+          autocomplete="new-password"
+          placeholder="Min. 4 karaktera"
+        />
+        @if (form.get('password')?.invalid && form.get('password')?.touched) {
+          <span class="field-error">Lozinka mora imati najmanje 4 karaktera</span>
+        }
+      </div>
+      <div class="field">
+        <label for="role">Uloga (opciono)</label>
+        <input
+          id="role"
+          type="text"
+          formControlName="role"
+          placeholder="npr. USER (ostavite prazno za USER)"
+        />
+      </div>
+      <button type="submit" class="btn btn-primary" [disabled]="loading">
+        {{ loading ? 'Registracija...' : 'Registruj se' }}
+      </button>
+      <p class="switch-auth">
+        Već imate nalog? <a routerLink="/login">Prijavite se</a>
+      </p>
+    </form>
+  }
+</div>
