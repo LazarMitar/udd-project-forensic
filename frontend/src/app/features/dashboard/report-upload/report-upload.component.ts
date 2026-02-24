@@ -24,7 +24,8 @@ export class ReportUploadComponent {
     description: [''],
     threatClassification: [''],
     hashValue: [''],
-    serverFilename: ['']
+    serverFilename: [''],
+    address: ['']
   });
 
   parsedDto: ForensicReportDTO | null = null;
@@ -54,7 +55,8 @@ export class ReportUploadComponent {
           description: dto.description ?? '',
           threatClassification: dto.threatClassification ?? '',
           hashValue: dto.hashValue ?? '',
-          serverFilename: dto.serverFilename ?? ''
+          serverFilename: dto.serverFilename ?? '',
+          address: dto.address ?? ''
         });
         this.loading = false;
       },

@@ -6,4 +6,5 @@ export interface ForensicReportDTO {
   threatClassification: string;
   hashValue: string;
   serverFilename: string;
+  address?: string;
 }

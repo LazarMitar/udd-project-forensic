@@ -17,7 +17,7 @@ public class ForensicReportParser {
         dto.setHashValue(extract(text, "SHA256:\\s*([A-Fa-f0-9]{32,64})"));
         dto.setDescription(extract(text, "Opis ponašanja malvera/pretnje:\\s*\\n([\\s\\S]+?)\\n\\s*\\n\\s*\\n"));
         dto.setForensicAnalyst(extract(text, "\\n([A-Za-z]+ [A-Za-z]+) [A-Za-z]+ [A-Za-z]+\\s*\\n\\s*\\nPotpis"));
-
+        dto.setAddress(extract(text, "Organizacija:\\s*[^\\n]+\\n([^\\n]+)"));
         return dto;
     }
 

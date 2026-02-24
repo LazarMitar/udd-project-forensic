@@ -1,0 +1,84 @@
+<div class="search-page">
+  <h2>Geolokaciona pretraga</h2>
+  <p class="intro">
+    Pretraga incidenata u zadatom radijusu oko unete adrese (grad, država ili puna adresa).
+  </p>
+
+  <form [formGroup]="form" (ngSubmit)="onSubmit()" class="search-form">
+    <div class="field">
+      <label for="address">Adresa / grad</label>
+      <input
+        id="address"
+        type="text"
+        formControlName="address"
+        placeholder="npr. Trg Dositeja Obradovića 6, Novi Sad"
+      />
+    </div>
+
+    <div class="field-inline">
+      <label for="radiusKm">Radijus (km)</label>
+      <input id="radiusKm" type="number" formControlName="radiusKm" min="1" />
+    </div>
+
+    <button type="submit" class="btn btn-primary" [disabled]="loading || form.invalid">
+      {{ loading ? 'Pretraga...' : 'Pretraži' }}
+    </button>
+  </form>
+
+  @if (centerCoords) {
+    <p class="coords">
+      Koordinate centra: <strong>{{ centerCoords.lat }}</strong>, <strong>{{ centerCoords.lon }}</strong>
+    </p>
+  }
+
+  @if (error) {
+    <div class="error-msg" role="alert">{{ error }}</div>
+  }
+
+  @if (!loading && page && page.totalElements === 0) {
+    <p class="no-results">Nema rezultata u zadatom radijusu.</p>
+  }
+
+  @if (page && page.totalElements > 0) {
+    <section class="results">
+      <h3>Rezultati ({{ page.totalElements }})</h3>
+      <div class="result-list">
+        @for (r of results; track r.document.id) {
+          <article class="result-card">
+            <header>
+              <h4>{{ r.document.malwareName || '(bez naziva malvera)' }}</h4>
+              <p class="meta">
+                <span *ngIf="r.document.forensicAnalyst">Forenzičar: {{ r.document.forensicAnalyst }}</span>
+                <span *ngIf="r.document.organization"> | Organizacija: {{ r.document.organization }}</span>
+              </p>
+            </header>
+            <p class="classification">
+              Klasifikacija: <strong>{{ r.document.threatClassification || 'n/a' }}</strong>
+              <span *ngIf="r.document.hashValue"> | Heš: {{ r.document.hashValue }}</span>
+              <span *ngIf="r.document.location">
+                | Lokacija: {{ r.document.location?.lat }}, {{ r.document.location?.lon }}
+              </span>
+            </p>
+            <p class="snippet" [innerHTML]="getHighlight(r) || r.document.description"></p>
+          </article>
+        }
+      </div>
+
+      <nav class="pagination" *ngIf="page.totalPages > 1">
+        <button type="button" class="btn btn-outline" (click)="goToPage(currentPage - 1)" [disabled]="currentPage === 0">
+          Prethodna
+        </button>
+        <span>Strana {{ currentPage + 1 }} / {{ page.totalPages }}</span>
+        <button
+          type="button"
+          class="btn btn-outline"
+          (click)="goToPage(currentPage + 1)"
+          [disabled]="currentPage + 1 >= page.totalPages"
+        >
+          Sledeća
+        </button>
+      </nav>
+    </section>
+  }
+</div>
+

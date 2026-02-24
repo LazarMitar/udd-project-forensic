@@ -28,4 +28,11 @@ public class SearchController {
                                                 Pageable pageable) {
         return searchService.advancedSearch(expression, pageable);
     }
+
+    @GetMapping("/geo")
+    public Page<SearchResultDTO> geoSearch(@RequestParam String address,
+                                           @RequestParam double radiusKm,
+                                           Pageable pageable) {
+        return searchService.geoSearch(address, radiusKm, pageable);
+    }
 }

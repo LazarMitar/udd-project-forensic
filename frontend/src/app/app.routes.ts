@@ -35,6 +35,11 @@ export const routes: Routes = [
         path: 'search',
         loadComponent: () =>
           import('./features/dashboard/search/search.component').then(m => m.SearchComponent)
+      },
+      {
+        path: 'geo',
+        loadComponent: () =>
+          import('./features/dashboard/geo-search/geo-search.component').then(m => m.GeoSearchComponent)
       }
     ]
   },

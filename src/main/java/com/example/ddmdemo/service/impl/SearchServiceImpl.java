@@ -27,6 +27,10 @@ import org.springframework.data.elasticsearch.core.query.highlight.Highlight;
 import org.springframework.data.elasticsearch.core.query.highlight.HighlightField;
 import org.springframework.data.elasticsearch.core.query.highlight.HighlightParameters;
 import org.springframework.stereotype.Service;
+import co.elastic.clients.elasticsearch._types.query_dsl.GeoDistanceQuery;
+import co.elastic.clients.elasticsearch._types.GeoLocation;
+import co.elastic.clients.elasticsearch._types.LatLonGeoLocation;
+import co.elastic.clients.elasticsearch._types.DistanceUnit;
 
 @Service
 @RequiredArgsConstructor
@@ -34,6 +38,8 @@ import org.springframework.stereotype.Service;
 public class SearchServiceImpl implements SearchService {
 
     private final ElasticsearchOperations elasticsearchTemplate;
+    private final GeocodingServiceImpl geocodingService;
+
 
     @Override
     public Page<SearchResultDTO> simpleSearch(List<String> keywords, Pageable pageable, boolean isKNN) {
@@ -64,6 +70,28 @@ public class SearchServiceImpl implements SearchService {
                 .withHighlightQuery(buildHighlightQuery())
                 .withPageable(pageable)
                 .build();
+        return runQuery(searchQuery);
+    }
+
+    public Page<SearchResultDTO> geoSearch(String address, double radiusKm, Pageable pageable) {
+        var coords = geocodingService.getCoordinates(address);
+        if (coords == null) return Page.empty();
+
+        var geoQuery = GeoDistanceQuery.of(g -> g
+                .field("location")
+                .location(GeoLocation.of(l -> l
+                        .latlon(LatLonGeoLocation.of(ll -> ll
+                                .lat(coords[0])
+                                .lon(coords[1])))))
+                .distance(radiusKm + "km")
+        )._toQuery();
+
+        var searchQuery = new NativeQueryBuilder()
+                .withQuery(geoQuery)
+                .withHighlightQuery(buildHighlightQuery())
+                .withPageable(pageable)
+                .build();
+
         return runQuery(searchQuery);
     }
 

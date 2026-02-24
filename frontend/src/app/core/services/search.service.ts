@@ -50,5 +50,33 @@ export class SearchService {
       withCredentials: true
     });
   }
+
+  getGeoCoords(
+    address: string
+  ): Observable<{ lat: number; lon: number }> {
+    const params = new HttpParams().set('address', address);
+    return this.http.get<{ lat: number; lon: number }>(`${environment.apiUrl}/api/geo/coords`, {
+      params,
+      withCredentials: true
+    });
+  }
+
+  geoSearch(
+    address: string,
+    radiusKm: number,
+    page: number,
+    size: number
+  ): Observable<PageResponse<SearchResult>> {
+    let params = new HttpParams()
+      .set('address', address)
+      .set('radiusKm', String(radiusKm))
+      .set('page', String(page))
+      .set('size', String(size));
+
+    return this.http.get<PageResponse<SearchResult>>(`${this.api}/geo`, {
+      params,
+      withCredentials: true
+    });
+  }
 }
 

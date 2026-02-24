@@ -23,6 +23,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.text.PDFTextStripper;
 import org.apache.tika.Tika;
+import org.elasticsearch.common.geo.GeoPoint;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -35,6 +36,7 @@ public class IndexingServiceImpl implements IndexingService {
     private final ForensicReportRepository forensicReportRepository;
     private final FileService fileService;
     private final ForensicReportParser forensicReportParser;
+    private final GeocodingServiceImpl geocodingService;
 
     @Override
     public ForensicReportDTO parseDocument(MultipartFile documentFile) {
@@ -71,6 +73,15 @@ public class IndexingServiceImpl implements IndexingService {
         index.setDescription(dto.getDescription());
         index.setThreatClassification(dto.getThreatClassification());
         index.setHashValue(dto.getHashValue());
+        if (dto.getAddress() != null && !dto.getAddress().isBlank()) {
+            var coords = geocodingService.getCoordinates(dto.getAddress());
+            if (coords != null) {
+                log.info("GEOCODING SUCCESS address={} lat={} lng={}", dto.getAddress(), coords[0], coords[1]);
+                index.setLocation(new GeoPoint(coords[0], coords[1]));
+            } else {
+                log.warn("GEOCODING FAILED address={}", dto.getAddress());
+            }
+        }
         index.setServerFilename(serverFilename);
 
         try {

@@ -11,4 +11,5 @@ import org.springframework.stereotype.Service;
 public interface SearchService {
     Page<SearchResultDTO> simpleSearch(List<String> keywords, Pageable pageable, boolean isKNN);
     Page<SearchResultDTO> advancedSearch(String expression, Pageable pageable);
+    Page<SearchResultDTO> geoSearch(String address, double radiusKm, Pageable pageable);
 }

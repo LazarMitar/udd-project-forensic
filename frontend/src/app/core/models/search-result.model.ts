@@ -7,6 +7,10 @@ export interface ForensicReportIndexDoc {
   threatClassification: string;
   hashValue: string;
   serverFilename: string;
+  location?: {
+    lat: number;
+    lon: number;
+  };
 }
 
 export interface SearchResult {

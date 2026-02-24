@@ -17,4 +17,5 @@ public class ForensicReportDTO {
     private String threatClassification;
     private String hashValue;
     private String serverFilename;
+    private String address;
 }
