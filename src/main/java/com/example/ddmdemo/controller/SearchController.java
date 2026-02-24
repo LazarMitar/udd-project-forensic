@@ -1,6 +1,7 @@
 package com.example.ddmdemo.controller;
 
 import com.example.ddmdemo.dto.SearchQueryDTO;
+import com.example.ddmdemo.dto.SearchResultDTO;
 import com.example.ddmdemo.indexmodel.ForensicReportIndex;
 import com.example.ddmdemo.service.interfaces.SearchService;
 import lombok.RequiredArgsConstructor;
@@ -16,15 +17,15 @@ public class SearchController {
     private final SearchService searchService;
 
     @PostMapping("/simple")
-    public Page<ForensicReportIndex> simpleSearch(@RequestParam Boolean isKnn,
-                                                  @RequestBody SearchQueryDTO simpleSearchQuery,
-                                                  Pageable pageable) {
+    public Page<SearchResultDTO> simpleSearch(@RequestParam Boolean isKnn,
+                                              @RequestBody SearchQueryDTO simpleSearchQuery,
+                                              Pageable pageable) {
         return searchService.simpleSearch(simpleSearchQuery.keywords(), pageable, isKnn);
     }
 
     @PostMapping("/advanced")
-    public Page<ForensicReportIndex> advancedSearch(@RequestParam String expression,
-                                                    Pageable pageable) {
+    public Page<SearchResultDTO> advancedSearch(@RequestParam String expression,
+                                                Pageable pageable) {
         return searchService.advancedSearch(expression, pageable);
     }
 }

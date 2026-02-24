@@ -12,6 +12,7 @@ import { RouterLink } from '@angular/router';
       <p>Imate pristup svim funkcionalnostima sistema u skladu sa vašom ulogom.</p>
       <nav class="quick-links">
         <a routerLink="/dashboard/upload" class="link">Upload forenzičkog izveštaja</a>
+        <a routerLink="/dashboard/search" class="link">Pretraga izveštaja</a>
       </nav>
       <p class="hint">Ovde će kasnije biti linkovi ka pretrazi i statistici.</p>
     </div>

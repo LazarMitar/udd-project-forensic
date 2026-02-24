@@ -4,25 +4,28 @@ import ai.djl.translate.TranslateException;
 import co.elastic.clients.elasticsearch._types.KnnQuery;
 import co.elastic.clients.elasticsearch._types.query_dsl.BoolQuery;
 import co.elastic.clients.elasticsearch._types.query_dsl.Query;
+import com.example.ddmdemo.dto.SearchResultDTO;
 import com.example.ddmdemo.indexmodel.ForensicReportIndex;
 import com.example.ddmdemo.service.interfaces.SearchService;
 import com.example.ddmdemo.util.VectorizationUtil;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Deque;
 import java.util.List;
 import java.util.stream.Collectors;
 import joptsimple.internal.Strings;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.elasticsearch.client.elc.NativeQuery;
 import org.springframework.data.elasticsearch.client.elc.NativeQueryBuilder;
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
-import org.springframework.data.elasticsearch.core.SearchHitSupport;
 import org.springframework.data.elasticsearch.core.mapping.IndexCoordinates;
+import org.springframework.data.elasticsearch.core.query.highlight.Highlight;
+import org.springframework.data.elasticsearch.core.query.highlight.HighlightField;
+import org.springframework.data.elasticsearch.core.query.highlight.HighlightParameters;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -33,45 +36,93 @@ public class SearchServiceImpl implements SearchService {
     private final ElasticsearchOperations elasticsearchTemplate;
 
     @Override
-    public Page<ForensicReportIndex> simpleSearch(List<String> keywords, Pageable pageable, boolean isKNN) {
+    public Page<SearchResultDTO> simpleSearch(List<String> keywords, Pageable pageable, boolean isKNN) {
         if (isKNN) {
             try {
-                return searchByVector(VectorizationUtil.getEmbedding(Strings.join(keywords, " ")));
+                return searchByVector(VectorizationUtil.getEmbedding(Strings.join(keywords, " ")), pageable);
             } catch (TranslateException e) {
                 log.error("Vectorization failed");
                 return Page.empty();
             }
         }
 
-        var searchQueryBuilder = new NativeQueryBuilder()
+        var searchQuery = new NativeQueryBuilder()
                 .withQuery(buildSimpleSearchQuery(keywords))
-                .withPageable(pageable);
+                .withHighlightQuery(buildHighlightQuery())
+                .withPageable(pageable)
+                .build();
 
-        return runQuery(searchQueryBuilder.build());
+        return runQuery(searchQuery);
     }
 
     @Override
-    public Page<ForensicReportIndex> advancedSearch(String expression, Pageable pageable) {
-        var query = buildBooleanQuery(expression);
-        var searchQueryBuilder = new NativeQueryBuilder()
-                .withQuery(query)
-                .withPageable(pageable);
-        return runQuery(searchQueryBuilder.build());
+    public Page<SearchResultDTO> advancedSearch(String expression, Pageable pageable) {
+        var searchQuery = new NativeQueryBuilder()
+                .withQuery(buildBooleanQuery(expression))
+                .withHighlightQuery(buildHighlightQuery())
+                .withPageable(pageable)
+                .build();
+        return runQuery(searchQuery);
     }
 
-    // Boolean parser - infiksna u postfiksnu notaciju (Shunting-yard algoritam)
+    private Page<SearchResultDTO> runQuery(NativeQuery searchQuery) {
+        var searchHits = elasticsearchTemplate.search(searchQuery, ForensicReportIndex.class,
+                IndexCoordinates.of("forensic_reports"));
+        var results = searchHits.getSearchHits().stream()
+                .map(hit -> new SearchResultDTO(hit.getContent(), hit.getHighlightFields()))
+                .collect(Collectors.toList());
+        return new PageImpl<>(results, searchQuery.getPageable(), searchHits.getTotalHits());
+    }
+
+    private Page<SearchResultDTO> searchByVector(float[] queryVector, Pageable pageable) {
+        Float[] floatObjects = new Float[queryVector.length];
+        for (int i = 0; i < queryVector.length; i++) floatObjects[i] = queryVector[i];
+        List<Float> floatList = Arrays.stream(floatObjects).collect(Collectors.toList());
+
+        var knnQuery = new KnnQuery.Builder()
+                .field("vectorizedContent")
+                .queryVector(floatList)
+                .numCandidates(100)
+                .k(10)
+                .boost(10.0f)
+                .build();
+
+        var searchQuery = NativeQuery.builder()
+                .withKnnQuery(knnQuery)
+                .withMaxResults(5)
+                .withSearchType(null)
+                .build();
+
+        var searchHits = elasticsearchTemplate.search(searchQuery, ForensicReportIndex.class);
+        var results = searchHits.getSearchHits().stream()
+                .map(hit -> new SearchResultDTO(hit.getContent(), hit.getHighlightFields()))
+                .collect(Collectors.toList());
+        return new PageImpl<>(results, pageable, searchHits.getTotalHits());
+    }
+
+    private org.springframework.data.elasticsearch.core.query.HighlightQuery buildHighlightQuery() {
+        var fields = List.of(
+                new HighlightField("forensic_analyst"),
+                new HighlightField("organization"),
+                new HighlightField("malware_name"),
+                new HighlightField("description")
+        );
+        var params = HighlightParameters.builder()
+                .withPreTags("<mark>")
+                .withPostTags("</mark>")
+                .build();
+        return new org.springframework.data.elasticsearch.core.query.HighlightQuery(
+                new Highlight(params, fields), ForensicReportIndex.class);
+    }
+
     private Query buildBooleanQuery(String expression) {
-        // Tokenizacija
         var tokens = tokenize(expression);
-        // Konverzija u postfiksnu notaciju
         var postfix = toPostfix(tokens);
-        // Gradnja ES upita iz postfiksa
         return evalPostfix(postfix);
     }
 
     private List<String> tokenize(String expression) {
         var tokens = new ArrayList<String>();
-        // Podrzavamo: field:value, "phrase query", AND, OR, NOT
         var matcher = java.util.regex.Pattern.compile(
                 "\"[^\"]+\"|AND|OR|NOT|[\\w]+:[\\w\\s\"-]+"
         ).matcher(expression);
@@ -84,7 +135,6 @@ public class SearchServiceImpl implements SearchService {
     private List<String> toPostfix(List<String> tokens) {
         var output = new ArrayList<String>();
         var stack = new ArrayDeque<String>();
-
         for (var token : tokens) {
             if (isOperator(token)) {
                 while (!stack.isEmpty() && precedence(stack.peek()) >= precedence(token)) {
@@ -95,15 +145,12 @@ public class SearchServiceImpl implements SearchService {
                 output.add(token);
             }
         }
-        while (!stack.isEmpty()) {
-            output.add(stack.pop());
-        }
+        while (!stack.isEmpty()) output.add(stack.pop());
         return output;
     }
 
     private Query evalPostfix(List<String> postfix) {
         var stack = new ArrayDeque<Query>();
-
         for (var token : postfix) {
             if (isOperator(token)) {
                 if (token.equals("NOT")) {
@@ -114,7 +161,7 @@ public class SearchServiceImpl implements SearchService {
                     var left = stack.pop();
                     if (token.equals("AND")) {
                         stack.push(BoolQuery.of(b -> b.must(left).must(right))._toQuery());
-                    } else { // OR
+                    } else {
                         stack.push(BoolQuery.of(b -> b.should(left).should(right))._toQuery());
                     }
                 }
@@ -126,14 +173,10 @@ public class SearchServiceImpl implements SearchService {
     }
 
     private Query buildSingleQuery(String token) {
-        // Proveri da li je phrase query (sadrzi navodnik)
         boolean isPhrase = token.contains("\"");
-
-        // Parsiranje field:value
         var parts = token.split(":", 2);
         var field = parts[0].trim();
         var value = parts[1].trim().replace("\"", "");
-
         if (isPhrase) {
             return co.elastic.clients.elasticsearch._types.query_dsl.MatchPhraseQuery.of(
                     m -> m.field(field).query(value))._toQuery();
@@ -168,40 +211,5 @@ public class SearchServiceImpl implements SearchService {
             });
             return b;
         })))._toQuery();
-    }
-
-    public Page<ForensicReportIndex> searchByVector(float[] queryVector) {
-        Float[] floatObjects = new Float[queryVector.length];
-        for (int i = 0; i < queryVector.length; i++) {
-            floatObjects[i] = queryVector[i];
-        }
-        List<Float> floatList = Arrays.stream(floatObjects).collect(Collectors.toList());
-
-        var knnQuery = new KnnQuery.Builder()
-                .field("vectorizedContent")
-                .queryVector(floatList)
-                .numCandidates(100)
-                .k(10)
-                .boost(10.0f)
-                .build();
-
-        var searchQuery = NativeQuery.builder()
-                .withKnnQuery(knnQuery)
-                .withMaxResults(5)
-                .withSearchType(null)
-                .build();
-
-        var searchHitsPaged = SearchHitSupport.searchPageFor(
-                elasticsearchTemplate.search(searchQuery, ForensicReportIndex.class),
-                searchQuery.getPageable());
-
-        return (Page<ForensicReportIndex>) SearchHitSupport.unwrapSearchHits(searchHitsPaged);
-    }
-
-    private Page<ForensicReportIndex> runQuery(NativeQuery searchQuery) {
-        var searchHits = elasticsearchTemplate.search(searchQuery, ForensicReportIndex.class,
-                IndexCoordinates.of("forensic_reports"));
-        var searchHitsPaged = SearchHitSupport.searchPageFor(searchHits, searchQuery.getPageable());
-        return (Page<ForensicReportIndex>) SearchHitSupport.unwrapSearchHits(searchHitsPaged);
     }
 }

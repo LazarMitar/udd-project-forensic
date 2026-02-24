@@ -8,8 +8,7 @@
           "serbian_cyrillic_to_latinic",
           "icu_folding",
           "lowercase",
-          "serbian_stop",
-          "serbian_stemmer"
+          "serbian_stop"
         ]
       }
     },
@@ -27,10 +26,6 @@
           "ono", "pa", "pak", "po", "pod", "pri", "s", "sa", "sam", "se", "si",
           "su", "sve", "svi", "svim", "ta", "taj", "tako", "te", "ti", "to",
           "tu", "u", "uz", "va", "vas", "već", "za", "ze"]
-      },
-      "serbian_stemmer": {
-        "type": "stemmer",
-        "language": "light_serbian"
       }
     }
   }

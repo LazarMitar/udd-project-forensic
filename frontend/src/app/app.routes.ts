@@ -30,6 +30,11 @@ export const routes: Routes = [
         path: 'upload',
         loadComponent: () =>
           import('./features/dashboard/report-upload/report-upload.component').then(m => m.ReportUploadComponent)
+      },
+      {
+        path: 'search',
+        loadComponent: () =>
+          import('./features/dashboard/search/search.component').then(m => m.SearchComponent)
       }
     ]
   },
