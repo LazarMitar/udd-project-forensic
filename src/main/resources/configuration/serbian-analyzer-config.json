@@ -3,11 +3,13 @@
     "analyzer": {
       "serbian_simple": {
         "type": "custom",
-        "tokenizer": "standard",
+        "tokenizer": "icu_tokenizer",
         "filter": [
           "serbian_cyrillic_to_latinic",
           "icu_folding",
-          "lowercase"
+          "lowercase",
+          "serbian_stop",
+          "serbian_stemmer"
         ]
       }
     },
@@ -15,6 +17,20 @@
       "serbian_cyrillic_to_latinic": {
         "type": "icu_transform",
         "id": "Any-Latin; NFD; [:Nonspacing Mark:] Remove; NFC"
+      },
+      "serbian_stop": {
+        "type": "stop",
+        "stopwords": ["a", "ali", "da", "de", "do", "i", "ili", "iz",
+          "je", "jer", "jo", "još", "ka", "kao", "kod", "koji", "koja",
+          "koje", "li", "me", "mi", "mu", "na", "nad", "nam", "nas", "ne",
+          "nego", "ni", "nije", "no", "o", "od", "oko", "on", "ona", "oni",
+          "ono", "pa", "pak", "po", "pod", "pri", "s", "sa", "sam", "se", "si",
+          "su", "sve", "svi", "svim", "ta", "taj", "tako", "te", "ti", "to",
+          "tu", "u", "uz", "va", "vas", "već", "za", "ze"]
+      },
+      "serbian_stemmer": {
+        "type": "stemmer",
+        "language": "light_serbian"
       }
     }
   }

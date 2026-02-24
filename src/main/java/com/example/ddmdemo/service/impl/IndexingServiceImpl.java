@@ -52,8 +52,11 @@ public class IndexingServiceImpl implements IndexingService {
 
         // Parsiranje teksta
         var text = extractDocumentContent(documentFile);
+        log.info("EXTRACTED TEXT:\n{}", text);
         var dto = forensicReportParser.parse(text);
         dto.setServerFilename(serverFilename);
+
+
 
         return dto;
     }
