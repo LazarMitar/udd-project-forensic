@@ -57,8 +57,10 @@ public class SearchServiceImpl implements SearchService {
 
     @Override
     public Page<SearchResultDTO> advancedSearch(String expression, Pageable pageable) {
+        var query = buildBooleanQuery(expression);
+        log.info("ES QUERY: {}", query.toString());
         var searchQuery = new NativeQueryBuilder()
-                .withQuery(buildBooleanQuery(expression))
+                .withQuery(query)
                 .withHighlightQuery(buildHighlightQuery())
                 .withPageable(pageable)
                 .build();
@@ -124,11 +126,12 @@ public class SearchServiceImpl implements SearchService {
     private List<String> tokenize(String expression) {
         var tokens = new ArrayList<String>();
         var matcher = java.util.regex.Pattern.compile(
-                "\"[^\"]+\"|AND|OR|NOT|[\\w]+:[\\w\\s\"-]+"
+                "[\\w]+:\"[^\"]+\"|[\\w]+:[^\\s]+|\\bAND\\b|\\bOR\\b|\\bNOT\\b"
         ).matcher(expression);
         while (matcher.find()) {
             tokens.add(matcher.group().trim());
         }
+        log.info("TOKENS: {}", tokens);
         return tokens;
     }
 

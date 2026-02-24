@@ -17,7 +17,7 @@ export class SearchComponent {
   private searchService = inject(SearchService);
 
   form = this.fb.nonNullable.group({
-    query: ['', [Validators.required]],
+    query: [''],
     useKnn: [false],
     advancedExpression: ['']
   });
