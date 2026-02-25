@@ -93,8 +93,15 @@ public class IndexingServiceImpl implements IndexingService {
 
         forensicReportIndexRepository.save(index);
 
-        log.info("REPORT_INDEXED SUCCESS organization={} analyst={} malware={} classification={}",
+        String city = "";
+        if (dto.getAddress() != null && !dto.getAddress().isBlank()) {
+            var parts = dto.getAddress().split(",");
+            city = parts[parts.length - 1].trim();
+        }
+
+        log.info("REPORT_INDEXED SUCCESS organization={} city={} analyst={} malware={} classification={}",
                 dto.getOrganization(),
+                city,
                 dto.getForensicAnalyst(),
                 dto.getMalwareName(),
                 dto.getThreatClassification());
